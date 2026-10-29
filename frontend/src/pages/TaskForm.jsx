@@ -28,7 +28,7 @@ export default function TaskForm() {
             description: data.description || '',
             status: data.status,
             priority: data.priority,
-            due_date: data.due_date || '',
+            due_date: data.due_date ? data.due_date.slice(0, 16) : '',
           });
         })
         .catch(() => alert('Ошибка загрузки задачи'))
@@ -45,17 +45,19 @@ export default function TaskForm() {
     setErrors({});
     setSaving(true);
     try {
+      const payload = { ...form, due_date: form.due_date || null };
+      
       if (isEdit) {
-        await api.put(`/tasks/${id}/`, form);
+        await api.put(`/tasks/${id}/`, payload);
       } else {
-        await api.post('/tasks/', form);
+        await api.post('/tasks/', payload);
       }
       navigate('/');
     } catch (err) {
       if (err.response && err.response.data && err.response.data.errors) {
         setErrors(err.response.data.errors);
       } else {
-        setErrors({ non_field_errors: 'Ошибка сохранения' });
+        setErrors({ non_field_errors: 'Ошибка сохранения. Проверьте данные.' });
       }
     } finally {
       setSaving(false);
@@ -65,21 +67,22 @@ export default function TaskForm() {
   if (loading) return <div className="empty">Загрузка...</div>;
 
   return (
-    <div className="card" style={{ maxWidth: '600px', margin: '0 auto' }}>
-      <h2>{isEdit ? 'Редактировать задачу' : 'Новая задача'}</h2>
+    <div className="card" style={{ maxWidth: '650px', margin: '0 auto' }}>
+      <h2 style={{ marginBottom: '20px' }}>{isEdit ? '✏️ Редактировать задачу' : '➕ Новая задача'}</h2>
       <form onSubmit={submit}>
         {errors.non_field_errors && (
           <div className="form-error">{errors.non_field_errors}</div>
         )}
         
         <div className="field">
-          <label>Название *</label>
+          <label>Название задачи *</label>
           <input
             name="title"
             value={form.title}
             onChange={change}
             required
             maxLength={120}
+            placeholder="Например: Сдать проект по вебу"
           />
           {errors.title && <span className="error">{errors.title}</span>}
         </div>
@@ -90,49 +93,52 @@ export default function TaskForm() {
             name="description"
             value={form.description}
             onChange={change}
-            rows={4}
+            rows={3}
             maxLength={2000}
+            placeholder="Детали задачи..."
           />
           {errors.description && <span className="error">{errors.description}</span>}
         </div>
 
-        <div className="field">
-          <label>Статус</label>
-          <select name="status" value={form.status} onChange={change}>
-            <option value="todo">To Do</option>
-            <option value="in_progress">In Progress</option>
-            <option value="done">Done</option>
-          </select>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div className="field">
+            <label>Статус</label>
+            <select name="status" value={form.status} onChange={change}>
+              <option value="todo">📌 К выполнению</option>
+              <option value="in_progress">⏳ В процессе</option>
+              <option value="done">✅ Выполнено</option>
+            </select>
+          </div>
+
+          <div className="field">
+            <label>Приоритет</label>
+            <select name="priority" value={form.priority} onChange={change}>
+              <option value="low">🟢 Низкий</option>
+              <option value="medium">🟡 Средний</option>
+              <option value="high">🔴 Высокий</option>
+            </select>
+          </div>
         </div>
 
         <div className="field">
-          <label>Приоритет</label>
-          <select name="priority" value={form.priority} onChange={change}>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </div>
-
-        <div className="field">
-          <label>Дедлайн</label>
+          <label>Дедлайн (Дата и Время)</label>
           <input
-            type="date"
+            type="datetime-local"
             name="due_date"
             value={form.due_date}
             onChange={change}
+            style={{ colorScheme: 'dark' }} 
           />
+          <small style={{ color: '#64748b', fontSize: '12px', marginTop: '4px' }}>
+            Выберите точное время (например, 09:00 для утренних задач или 19:00 для вечерних)
+          </small>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-          <button className="btn btn-primary" type="submit" disabled={saving}>
-            {saving ? 'Сохранение...' : 'Сохранить'}
+        <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+          <button className="btn btn-primary" type="submit" disabled={saving} style={{ flex: 1, justifyContent: 'center' }}>
+            {saving ? 'Сохранение...' : 'Сохранить задачу'}
           </button>
-          <button 
-            type="button" 
-            className="btn btn-secondary" 
-            onClick={() => navigate('/')}
-          >
+          <button type="button" className="btn btn-secondary" onClick={() => navigate('/')} style={{ flex: 1, justifyContent: 'center' }}>
             Отмена
           </button>
         </div>
