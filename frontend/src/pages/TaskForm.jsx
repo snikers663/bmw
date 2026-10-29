@@ -17,43 +17,72 @@ export default function TaskForm() {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
+  const [showToast, setShowToast] = useState(false);
 
   useEffect(() => {
     if (isEdit) {
       api.get(`/tasks/${id}/`)
         .then((res) => {
           const data = res.data;
+          
+          // --- МАГИЯ ЧАСОВЫХ ПОЯСОВ ---
+          let localDate = '';
+          if (data.due_date) {
+            const d = new Date(data.due_date);
+            // Корректируем время на разницу с UTC (часовой пояс браузера)
+            d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+            // Отрезаем секунды и миллисекунды для инпута
+            localDate = d.toISOString().slice(0, 16);
+          }
+          // ----------------------------
+
           setForm({
             title: data.title,
             description: data.description || '',
             status: data.status,
             priority: data.priority,
-            due_date: data.due_date ? data.due_date.slice(0, 16) : '',
+            due_date: localDate,
           });
         })
         .catch(() => alert('Ошибка загрузки задачи'))
         .finally(() => setLoading(false));
     }
   }, [id, isEdit]);
-
   const change = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
   const submit = async (e) => {
     e.preventDefault();
+    console.log("Кнопка нажата! Отправляем данные:", form);
     setErrors({});
     setSaving(true);
+    
     try {
-      const payload = { ...form, due_date: form.due_date || null };
+      // Преобразуем дату "29.10.2026, 10:10" в "2026-10-29T10:10:00"
+      let formattedDate = null;
+      if (form.due_date) {
+        formattedDate = new Date(form.due_date).toISOString();
+      }
+
+      const payload = { 
+        ...form, 
+        due_date: formattedDate 
+      };
+      console.log("Отправляем на сервер:", payload);
       
       if (isEdit) {
         await api.put(`/tasks/${id}/`, payload);
       } else {
         await api.post('/tasks/', payload);
       }
+      
+      console.log("Успех! Переходим на главную.");
       navigate('/');
+      
     } catch (err) {
+      console.error("Ошибка при сохранении:", err.response || err);
+      
       if (err.response && err.response.data && err.response.data.errors) {
         setErrors(err.response.data.errors);
       } else {
@@ -63,12 +92,21 @@ export default function TaskForm() {
       setSaving(false);
     }
   };
-
   if (loading) return <div className="empty">Загрузка...</div>;
 
   return (
-    <div className="card" style={{ maxWidth: '650px', margin: '0 auto' }}>
+    <div className="card animate-slide-up" style={{ maxWidth: '650px', margin: '0 auto', position: 'relative' }}>
+      
+      {/* Красивое всплывающее окно успеха */}
+      {showToast && (
+        <div className="success-overlay">
+          <div className="success-icon">🎉</div>
+          <div className="success-text">Задача сохранена!</div>
+        </div>
+      )}
+
       <h2 style={{ marginBottom: '20px' }}>{isEdit ? '✏️ Редактировать задачу' : '➕ Новая задача'}</h2>
+      
       <form onSubmit={submit}>
         {errors.non_field_errors && (
           <div className="form-error">{errors.non_field_errors}</div>

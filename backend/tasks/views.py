@@ -51,27 +51,44 @@ class TaskViewSet(viewsets.ModelViewSet):
         ws.freeze_panes = 'A2'
         ws.auto_filter.ref = ws.dimensions
 
-        status_map = {'todo': 'To Do', 'in_progress': 'In Progress', 'done': 'Done'}
-        priority_map = {'low': 'Low', 'medium': 'Medium', 'high': 'High'}
+        status_map = {'todo': 'К выполнению', 'in_progress': 'В процессе', 'done': 'Выполнено'}
+        priority_map = {'low': 'Низкий', 'medium': 'Средний', 'high': 'Высокий'}
 
         for t in qs:
+            # ГЛАВНЫЙ ФИКС: убираем часовой пояс и делаем строку
+            if t.due_date:
+                clean_date = t.due_date.replace(tzinfo=None)
+                due_str = clean_date.strftime('%d.%m.%Y %H:%M')
+            else:
+                due_str = ''
+
+            if t.created_at:
+                clean_created = t.created_at.replace(tzinfo=None)
+                created_str = clean_created.strftime('%d.%m.%Y %H:%M')
+            else:
+                created_str = ''
+
             ws.append([
                 _safe_excel_value(t.title),
                 status_map.get(t.status, t.status),
                 priority_map.get(t.priority, t.priority),
-                t.due_date,
+                due_str,
                 _safe_excel_value(t.description or ''),
-                t.created_at.strftime('%d.%m.%Y'),
+                created_str,
             ])
 
+        # Безопасная настройка ширины колонок
         for col in ws.columns:
-            max_len = max(len(str(c.value)) if c.value is not None else 0 for c in col)
-            ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 50)
-
-        for row in ws.iter_rows(min_row=2, min_col=4, max_col=4):
-            for cell in row:
-                if cell.value:
-                    cell.number_format = 'DD.MM.YYYY'
+            max_length = 0
+            column = col[0].column_letter
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 4, 50)
+            ws.column_dimensions[column].width = adjusted_width
 
         response = HttpResponse(
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
